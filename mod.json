@@ -1,0 +1,76 @@
+{
+  "geode": "5.3.0",
+  "gd": {
+    "win": "2.2081",
+    "android": "2.2081",
+    "mac": "2.2081",
+    "ios": "2.2081"
+  },
+  "id": "the-motherfucking-bearodactyl.fuzzify",
+  "name": "Fuzzify",
+  "version": "v1.0.0",
+  "developer": "The Motherfucking Bearodactyl",
+  "description": "Makes level search fuzzy",
+  "dependencies": {
+    "geode.node-ids": ">=v1.20.0"
+  },
+  "resources": {
+    "files": ["dictionary.txt"]
+  },
+  "settings": {
+    "enabled": {
+      "name": "Enable Fuzzy Search",
+      "description": "When disabled, searches use the normal GD search.",
+      "type": "bool",
+      "default": true
+    },
+    "result-limit": {
+      "name": "Result Limit",
+      "description": "Maximum number of results to fetch from GDHistory.",
+      "type": "int",
+      "default": 20,
+      "min": 5,
+      "max": 50
+    },
+    "timeout-secs": {
+      "name": "Request Timeout (seconds)",
+      "description": "How long to wait for GDHistory before falling back to normal search.",
+      "type": "int",
+      "default": 6,
+      "min": 2,
+      "max": 15
+    },
+    "name-weight": {
+      "name": "Name Weight",
+      "description": "How much the level name contributes to the fuzzy score.",
+      "type": "int",
+      "default": 100,
+      "min": 0,
+      "max": 200
+    },
+    "creator-weight": {
+      "name": "Creator Weight",
+      "description": "How much the creator name contributes to the fuzzy score. Useful for finding levels by a specific creator.",
+      "type": "int",
+      "default": 30,
+      "min": 0,
+      "max": 200
+    },
+    "max-typos": {
+      "name": "Max Typos",
+      "description": "Maximum number of character substitutions allowed when scoring a match. Higher values are more forgiving of typos but may surface less relevant results.",
+      "type": "int",
+      "default": 2,
+      "min": 0,
+      "max": 4
+    },
+    "query-variations": {
+      "name": "Query Variations",
+      "description": "Maximum number of query variations to search in parallel (deletions, word splits, transpositions). More variations find more typo results but increase API load.",
+      "type": "int",
+      "default": 6,
+      "min": 1,
+      "max": 10
+    }
+  }
+}
