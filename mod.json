@@ -6,10 +6,10 @@
     "mac": "2.2081",
     "ios": "2.2081"
   },
-  "id": "the-motherfucking-bearodactyl.fuzzinator2000",
+  "id": "the-motherfricking-bearodactyl.fuzzinator2000",
   "name": "The Fuzz-inator 2000",
-  "version": "v1.0.0",
-  "developer": "The Motherfucking Bearodactyl",
+  "version": "v1.0.1",
+  "developer": "The Bearodactyl",
   "description": "Makes level search fuzzy",
   "dependencies": {
     "geode.node-ids": ">=v1.20.0"
