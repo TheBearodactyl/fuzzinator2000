@@ -22,9 +22,9 @@ namespace {
 $on_mod(Loaded) {
 	auto path = Mod::get()->getResourcesDir() / "dictionary.txt";
 	if (dictionary::load(path)) {
-		log::info("[Fuzzify] Dictionary loaded ({} words)", dictionary::word_count());
+		log::info("[The Fuzz-inator 2000] Dictionary loaded ({} words)", dictionary::word_count());
 	} else {
-		log::warn("[Fuzzify] Could not load dictionary from {}", path.string());
+		log::warn("[The Fuzz-inator 2000] Could not load dictionary from {}", path.string());
 	}
 }
 
@@ -360,7 +360,7 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 		m_fields->is_searching = false;
 		cancel_searches();
 		show_toast("GDHistory unreachable — using normal search");
-		log::info("[Fuzzify] Falling back to original GD search");
+		log::info("[The Fuzz-inator 2000] Falling back to original GD search");
 		LevelSearchLayer::onSearch(m_fields->pending_sender.data());
 		m_fields->pending_sender = nullptr;
 	}
@@ -392,7 +392,7 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 	void finalize_search(std::shared_ptr<SearchContext> const& ctx) {
 		if (ctx->collected->count() == 0) {
 			log::info(
-				"[Fuzzify] All queries returned 0 results (failed={}/{}), falling back",
+				"[The Fuzz-inator 2000] All queries returned 0 results (failed={}/{}), falling back",
 				ctx->failed_count,
 				ctx->total_queries
 			);
@@ -431,11 +431,15 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 			return a.score > b.score;
 		});
 
-		log::info("[Fuzzify] {} unique levels collected for \"{}\"", entries.size(), m_fields->pending_query);
+		log::info(
+			"[The Fuzz-inator 2000] {} unique levels collected for \"{}\"",
+			entries.size(),
+			m_fields->pending_query
+		);
 		for (std::size_t i = 0; i < std::min(entries.size(), std::size_t(5)); ++i) {
 			auto* lvl = entries[i].level;
 			log::debug(
-				"[Fuzzify]   #{}: \"{}\" by {} id={} score={}",
+				"[The Fuzz-inator 2000]   #{}: \"{}\" by {} id={} score={}",
 				i + 1,
 				std::string(lvl->m_levelName),
 				std::string(lvl->m_creatorName),
@@ -479,10 +483,10 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 			if (json_result) {
 				collect_hits(json_result.unwrap(), ctx);
 			} else {
-				log::warn("[Fuzzify] JSON parse error: {}", json_result.unwrapErr());
+				log::warn("[The Fuzz-inator 2000] JSON parse error: {}", json_result.unwrapErr());
 			}
 		} else {
-			log::warn("[Fuzzify] GDHistory HTTP {}", res.code());
+			log::warn("[The Fuzz-inator 2000] GDHistory HTTP {}", res.code());
 			ctx->failed_count++;
 		}
 
@@ -525,9 +529,13 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 		auto variations = generate_query_variations(raw_query, max_queries, max_typos);
 		const auto norm_query = fuzzy::normalise(raw_query);
 
-		log::info("[Fuzzify] Searching with {} query variation(s) for \"{}\"", variations.size(), raw_query);
+		log::info(
+			"[The Fuzz-inator 2000] Searching with {} query variation(s) for \"{}\"",
+			variations.size(),
+			raw_query
+		);
 		for (auto const& v : variations) {
-			log::debug("[Fuzzify]   variation: \"{}\"", v);
+			log::debug("[The Fuzz-inator 2000]   variation: \"{}\"", v);
 		}
 
 		show_toast("Fuzzy searching via GDHistory…");
@@ -543,7 +551,7 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 			const std::string url = GDHISTORY_SEARCH_URL + "?query=" + url_encode(variation) +
 				"&limit=" + std::to_string(per_query_limit) + "&matching_strategy=last";
 
-			log::info("[Fuzzify] Requesting: {}", url);
+			log::info("[The Fuzz-inator 2000] Requesting: {}", url);
 
 			auto req = web::WebRequest();
 			req.timeout(std::chrono::seconds(timeout));
@@ -573,7 +581,7 @@ class $modify(FuzzyBrowserLayer, LevelBrowserLayer) {
 		pending_levels = nullptr;
 		inject_on_load = false;
 
-		log::info("[Fuzzify] Injecting {} levels into LevelBrowserLayer", arr->count());
+		log::info("[The Fuzz-inator 2000] Injecting {} levels into LevelBrowserLayer", arr->count());
 
 		LevelBrowserLayer::setupLevelBrowser(arr);
 		this->loadLevelsFinished(arr, "", 0);
