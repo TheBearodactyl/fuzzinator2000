@@ -8,11 +8,14 @@
   },
   "id": "the-motherfricking-bearodactyl.fuzzinator2000",
   "name": "The Fuzz-inator 2000",
-  "version": "v1.0.1",
+  "version": "v1.0.2",
   "developer": "The Bearodactyl",
   "description": "Makes level search fuzzy",
   "dependencies": {
     "geode.node-ids": ">=v1.20.0"
+  },
+  "links": {
+    "source": "https://github.com/TheBearodactyl/fuzzinator2000"
   },
   "resources": {
     "files": ["dictionary.txt"]
