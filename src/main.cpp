@@ -314,7 +314,7 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 		if (m_searchInput != nullptr) {
 			auto* input = m_searchInput;
 			if (!input->m_allowedChars.empty()) {
-				input->m_allowedChars.append("\"<>=~!_");
+				input->m_allowedChars = fmt::format("{}\"<>=~!_", input->m_allowedChars);
 			}
 			input->m_maxLabelLength = 256;
 		}
