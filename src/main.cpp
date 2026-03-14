@@ -314,7 +314,7 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 		if (m_searchInput != nullptr) {
 			auto* input = m_searchInput;
 			if (!input->m_allowedChars.empty()) {
-				input->m_allowedChars = input->m_allowedChars + "\"<>=~!";
+				input->m_allowedChars = input->m_allowedChars + gd::string("\"<>=~!");
 			}
 			input->m_maxLabelLength = 256;
 		}
