@@ -72,5 +72,9 @@
       "min": 1,
       "max": 10
     }
+  },
+  "links": {
+    "source": "https://github.com/TheBearodactyl/fuzzinator2000",
+    "homepage": "https://bearodactyl.dev"
   }
 }

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Search parameters (WIP)
+- Links to stuff in `mod.json`
 
 ### Changed
 
@@ -22,4 +23,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mod broke the ability to jump in levels
 - Difficulty faces now display a lot more consistently
 - Only display deleted levels if explicitly enabled via a search parameter
-
