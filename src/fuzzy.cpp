@@ -3,45 +3,53 @@
 #include <cassert>
 #include <cctype>
 
+#include "utils.hpp"
+
 namespace fuzzy {
 	namespace detail {
 		[[nodiscard]]
-		static inline char to_lower(char c) {
-			return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+		static inline auto to_lower(char chr) -> char {
+			return static_cast<char>(std::tolower(static_cast<unsigned char>(chr)));
 		}
 
 		[[nodiscard]]
-		static inline bool is_word_sep(char c) {
-			return c == ' ' || c == '_' || c == '-' || c == '.' || c == '/' || c == '\\';
+		static inline auto is_word_sep(char chr) -> bool {
+			return chr == ' ' || chr == '_' || chr == '-' || chr == '.' || chr == '/' || chr == '\\';
 		}
 
 		[[nodiscard]]
-		static inline bool is_word_start(char prev, char cur) {
+		static inline auto is_word_start(char prev, char cur) -> bool {
 			if (is_word_sep(prev)) {
 				return true;
 			}
+
 			auto uc_prev = static_cast<unsigned char>(prev);
 			auto uc_cur = static_cast<unsigned char>(cur);
-			if (std::islower(uc_prev) && std::isupper(uc_cur)) {
+
+			if ((std::islower(uc_prev) != 0) && (std::isupper(uc_cur) != 0)) {
 				return true;
 			}
-			if (std::isdigit(uc_prev) && std::isalpha(uc_cur)) {
+
+			if ((std::isdigit(uc_prev) != 0) && (std::isalpha(uc_cur) != 0)) {
 				return true;
 			}
 			return false;
 		}
 
 		[[nodiscard]]
-		static inline int pos_bonus(std::string_view haystack, int hi) {
-			if (hi == 0) {
+		static inline auto pos_bonus(StringV haystack, int hidx) -> int {
+			if (hidx == 0) {
 				return BONUS_STR_START;
 			}
-			if (is_word_start(haystack[static_cast<std::size_t>(hi - 1)], haystack[static_cast<std::size_t>(hi)])) {
+
+			if (is_word_start(haystack[static_cast<std::size_t>(hidx - 1)], haystack[static_cast<std::size_t>(hidx)])) {
 				return BONUS_WORD_START;
 			}
-			auto uc_prev = static_cast<unsigned char>(haystack[static_cast<std::size_t>(hi - 1)]);
-			auto uc_cur = static_cast<unsigned char>(haystack[static_cast<std::size_t>(hi)]);
-			if (std::islower(uc_prev) && std::isupper(uc_cur)) {
+
+			auto uc_prev = static_cast<unsigned char>(haystack[static_cast<std::size_t>(hidx - 1)]);
+			auto uc_cur = static_cast<unsigned char>(haystack[static_cast<std::size_t>(hidx)]);
+
+			if ((std::islower(uc_prev) != 0) && (std::isupper(uc_cur) != 0)) {
 				return BONUS_CAMEL_CASE;
 			}
 			return 0;
@@ -51,41 +59,57 @@ namespace fuzzy {
 			int best_score;
 			int best_hi;
 
-			std::vector<std::vector<int>> dp_table;
-			std::vector<std::vector<int>> run_table;
+			Vec<Vec<int>> dp_table;
+			Vec<Vec<int>> run_table;
 		};
 
-		static DpResult run_dp(std::string_view needle, std::string_view haystack, bool need_positions, int max_typos) {
-			const int n = static_cast<int>(needle.size());
-			const int h = static_cast<int>(haystack.size());
+		static auto run_dp(needle_haysack, bool need_positions, int max_typos) -> DpResult {
+			const int needle_size = static_cast<int>(needle.size());
+			const int haystack_size = static_cast<int>(haystack.size());
 
-			if (n == 0 || h == 0 || n > h) {
-				return {SCORE_NO_MATCH, -1, {}, {}};
+			if (needle_size == 0 || haystack_size == 0 || needle_size > haystack_size) {
+				return {
+					.best_score = SCORE_NO_MATCH,
+					.best_hi = -1,
+					.dp_table = {},
+					.run_table = {},
+				};
 			}
 
-			std::vector<int> dp(static_cast<std::size_t>(n * h), SCORE_NO_MATCH);
-			std::vector<int> run(static_cast<std::size_t>(n * h), 0);
-			std::vector<int> typos(static_cast<std::size_t>(n * h), 0);
+			Vec<int> dp(static_cast<std::size_t>(needle_size * haystack_size), SCORE_NO_MATCH);
+			Vec<int> run(static_cast<std::size_t>(needle_size * haystack_size), 0);
+			Vec<int> typos(static_cast<std::size_t>(needle_size * haystack_size), 0);
 
-			auto cell = [&](int ni, int hi) -> int& { return dp[ni * h + hi]; };
-			auto runc = [&](int ni, int hi) -> int& { return run[ni * h + hi]; };
-			auto typoc = [&](int ni, int hi) -> int& { return typos[ni * h + hi]; };
+			auto cell = [&](int needle_index, int haystack_index) -> int& {
+				return dp[(needle_index * haystack_size) + haystack_index];
+			};
 
-			for (int hi = 0; hi < h; ++hi) {
+			auto runc = [&](int needle_index, int haystack_index) -> int& {
+				return run[(needle_index * haystack_size) + haystack_index];
+			};
+
+			auto typoc = [&](int needle_index, int haystack_index) -> int& {
+				return typos[(needle_index * haystack_size) + haystack_index];
+			};
+
+			for (int hi = 0; hi < haystack_size; ++hi) {
 				const bool exact = to_lower(needle[0]) == to_lower(haystack[static_cast<std::size_t>(hi)]);
+
 				if (!exact && max_typos <= 0) {
 					continue;
 				}
+
 				const int typo_pen = exact ? 0 : PENALTY_TYPO;
-				cell(0, hi) = SCORE_MATCH + typo_pen + pos_bonus(haystack, hi) + hi * PENALTY_SKIP;
+
+				cell(0, hi) = SCORE_MATCH + typo_pen + pos_bonus(haystack, hi) + (hi * PENALTY_SKIP);
 				runc(0, hi) = 1;
 				typoc(0, hi) = exact ? 0 : 1;
 			}
 
-			for (int ni = 1; ni < n; ++ni) {
-				const char nc = to_lower(needle[static_cast<std::size_t>(ni)]);
-				for (int hi = ni; hi < h; ++hi) {
-					const bool exact = to_lower(haystack[static_cast<std::size_t>(hi)]) == nc;
+			for (int ni = 1; ni < needle_size; ++ni) {
+				const char needle_char = to_lower(needle[static_cast<std::size_t>(ni)]);
+				for (int hi = ni; hi < haystack_size; ++hi) {
+					const bool exact = to_lower(haystack[static_cast<std::size_t>(hi)]) == needle_char;
 					if (!exact && max_typos <= 0) {
 						continue;
 					}
@@ -102,7 +126,7 @@ namespace fuzzy {
 						if (new_t > max_typos) {
 							continue;
 						}
-						const int candidate = cell(ni - 1, phi) + (hi - phi - 1) * PENALTY_SKIP;
+						const int candidate = cell(ni - 1, phi) + ((hi - phi - 1) * PENALTY_SKIP);
 						if (candidate > best_prev) {
 							best_prev = candidate;
 							best_prev_hi = phi;
@@ -133,42 +157,51 @@ namespace fuzzy {
 
 			int best_score = SCORE_NO_MATCH;
 			int best_hi = -1;
-			for (int hi = n - 1; hi < h; ++hi) {
-				if (cell(n - 1, hi) > best_score) {
-					best_score = cell(n - 1, hi);
+			for (int hi = needle_size - 1; hi < haystack_size; ++hi) {
+				if (cell(needle_size - 1, hi) > best_score) {
+					best_score = cell(needle_size - 1, hi);
 					best_hi = hi;
 				}
 			}
 
 			if (!need_positions) {
-				return {best_score, best_hi, {}, {}};
+				return {
+					.best_score = best_score,
+					.best_hi = best_hi,
+					.dp_table = {},
+					.run_table = {},
+				};
 			}
 
-			std::vector<std::vector<int>> dp_table(
-				static_cast<std::size_t>(n),
-				std::vector<int>(static_cast<std::size_t>(h))
+			Vec<Vec<int>> dp_table(
+				static_cast<std::size_t>(needle_size),
+				std::vector<int>(static_cast<std::size_t>(haystack_size))
 			);
-			std::vector<std::vector<int>> run_table(
-				static_cast<std::size_t>(n),
-				std::vector<int>(static_cast<std::size_t>(h))
+			Vec<Vec<int>> run_table(
+				static_cast<std::size_t>(needle_size),
+				std::vector<int>(static_cast<std::size_t>(haystack_size))
 			);
-			for (int ni = 0; ni < n; ++ni) {
-				for (int hi = 0; hi < h; ++hi) {
+			for (int ni = 0; ni < needle_size; ++ni) {
+				for (int hi = 0; hi < haystack_size; ++hi) {
 					dp_table[static_cast<std::size_t>(ni)][static_cast<std::size_t>(hi)] = cell(ni, hi);
 					run_table[static_cast<std::size_t>(ni)][static_cast<std::size_t>(hi)] = runc(ni, hi);
 				}
 			}
 
-			return {best_score, best_hi, std::move(dp_table), std::move(run_table)};
+			return {
+				.best_score = best_score,
+				.best_hi = best_hi,
+				.dp_table = std::move(dp_table),
+				.run_table = std::move(run_table),
+			};
 		}
 
-		static std::vector<int>
-		backtrack(std::string_view needle, std::vector<std::vector<int>> const& dp_table, int start_hi) {
-			const int n = static_cast<int>(needle.size());
-			std::vector<int> positions(static_cast<std::size_t>(n), -1);
+		static auto backtrack(StringV needle, Vec<Vec<int>> const& dp_table, int start_hi) -> Vec<int> {
+			const int needle_size = static_cast<int>(needle.size());
+			Vec<int> positions(static_cast<std::size_t>(needle_size), -1);
 
 			int cur_hi = start_hi;
-			for (int ni = n - 1; ni >= 0; --ni) {
+			for (int ni = needle_size - 1; ni >= 0; --ni) {
 				positions[static_cast<std::size_t>(ni)] = cur_hi;
 				if (ni == 0) {
 					break;
@@ -181,7 +214,7 @@ namespace fuzzy {
 					if (val == SCORE_NO_MATCH) {
 						continue;
 					}
-					const int candidate = val + (cur_hi - phi - 1) * PENALTY_SKIP;
+					const int candidate = val + ((cur_hi - phi - 1) * PENALTY_SKIP);
 					if (candidate > best) {
 						best = candidate;
 						prev_hi = phi;
@@ -197,26 +230,30 @@ namespace fuzzy {
 
 	} // namespace detail
 
-	bool is_subsequence(std::string_view needle, std::string_view haystack) {
-		std::size_t ni = 0;
-		for (std::size_t hi = 0; hi < haystack.size() && ni < needle.size(); ++hi) {
-			if (detail::to_lower(needle[ni]) == detail::to_lower(haystack[hi])) {
-				++ni;
+	auto is_subsequence(needle_haysack) -> bool {
+		std::size_t needle_index = 0;
+		for (std::size_t hi = 0; hi < haystack.size() && needle_index < needle.size(); ++hi) {
+			if (detail::to_lower(needle[needle_index]) == detail::to_lower(haystack[hi])) {
+				++needle_index;
 			}
 		}
-		return ni == needle.size();
+		return needle_index == needle.size();
 	}
 
-	int score_of(std::string_view needle, std::string_view haystack, int max_typos) {
+	auto score_of(needle_haysack, int max_typos) -> int {
 		if (needle.empty()) {
 			return 0;
 		}
+
 		return detail::run_dp(needle, haystack, false, max_typos).best_score;
 	}
 
-	std::optional<MatchResult> find_match(std::string_view needle, std::string_view haystack) {
+	auto find_match(needle_haysack) -> Option<MatchResult> {
 		if (needle.empty()) {
-			return MatchResult {0, {}};
+			return MatchResult {
+				.score = 0,
+				.positions = {},
+			};
 		}
 
 		auto res = detail::run_dp(needle, haystack, true, 0);
@@ -225,22 +262,25 @@ namespace fuzzy {
 		}
 
 		auto positions = detail::backtrack(needle, res.dp_table, res.best_hi);
-		return MatchResult {res.best_score, std::move(positions)};
+		return MatchResult {
+			.score = res.best_score,
+			.positions = std::move(positions),
+		};
 	}
 
-	std::string normalise(std::string_view raw) {
-		std::string out;
+	auto normalise(StringV raw) -> String {
+		String out;
 		out.reserve(raw.size());
 		bool prev_was_space = true;
-		for (char c : raw) {
-			const bool is_ws = (c == ' ' || c == '\t' || c == '\n' || c == '\r');
+		for (char chr : raw) {
+			const bool is_ws = (chr == ' ' || chr == '\t' || chr == '\n' || chr == '\r');
 			if (is_ws) {
 				if (!prev_was_space) {
 					out += ' ';
 				}
 				prev_was_space = true;
 			} else {
-				out += detail::to_lower(c);
+				out += detail::to_lower(chr);
 				prev_was_space = false;
 			}
 		}

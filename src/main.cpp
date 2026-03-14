@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <list>
 #include <memory>
 #include <unordered_set>
+#include <utility>
 
 #include <Geode/Geode.hpp>
 #include <Geode/modify/LevelBrowserLayer.hpp>
@@ -9,14 +11,20 @@
 
 #include "dictionary.hpp"
 #include "fuzzy.hpp"
+#include "query.hpp"
 
 using namespace geode::prelude;
 
-static const std::string GDHISTORY_SEARCH_URL = "https://history.geometrydash.eu/api/v1/search/level/advanced/";
+template<typename T>
+using Vec = std::vector<T>;
+
+using String = std::string;
+
+static const String GDHISTORY_SEARCH_URL = "https://history.geometrydash.eu/api/v1/search/level/advanced/";
 
 namespace {
 	CCArray* pending_levels = nullptr;
-	bool inject_on_load = false;
+	bool INJECT_ON_LOAD = false;
 } // namespace
 
 $on_mod(Loaded) {
@@ -29,75 +37,49 @@ $on_mod(Loaded) {
 }
 
 [[nodiscard]]
-static int json_int(matjson::Value const& obj, std::string_view key, int fallback = 0) {
-	auto const& v = obj[key];
-	if (!v.isNumber()) {
+static auto json_int(matjson::Value const& obj, std::string_view key, int fallback = 0) -> int {
+	auto const& val = obj[key];
+	if (!val.isNumber()) {
 		return fallback;
 	}
-	return static_cast<int>(v.asInt().unwrapOr(fallback));
+	return static_cast<int>(val.asInt().unwrapOr(fallback));
 }
 
 [[nodiscard]]
-static std::string json_str(matjson::Value const& obj, std::string_view key) {
-	auto const& v = obj[key];
-	if (!v.isString()) {
+static auto json_str(matjson::Value const& obj, std::string_view key) -> String {
+	auto const& val = obj[key];
+	if (!val.isString()) {
 		return {};
 	}
-	return v.asString().unwrapOr("");
+	return val.asString().unwrapOr("");
 }
 
 [[nodiscard]]
-static bool json_bool(matjson::Value const& obj, std::string_view key) {
-	auto const& v = obj[key];
-	if (v.isBool()) {
-		return v.asBool().unwrapOr(false);
+static auto json_bool(matjson::Value const& obj, std::string_view key) -> bool {
+	auto const& val = obj[key];
+	if (val.isBool()) {
+		return val.asBool().unwrapOr(false);
 	}
-	if (v.isNumber()) {
-		return v.asInt().unwrapOr(0) != 0;
+	if (val.isNumber()) {
+		return val.asInt().unwrapOr(0) != 0;
 	}
 	return false;
 }
 
 [[nodiscard]]
-static GJDifficulty difficulty_from_filter(int f) {
-	switch (f) {
-		case 1:
-			return GJDifficulty::Auto;
-		case 2:
-			return GJDifficulty::Easy;
-		case 3:
-			return GJDifficulty::Normal;
-		case 4:
-			return GJDifficulty::Hard;
-		case 5:
-			return GJDifficulty::Harder;
-		case 6:
-			return GJDifficulty::Insane;
-		case 7:
-		case 8:
-		case 9:
-		case 10:
-		case 11:
-			return GJDifficulty::Insane;
-		default:
-			return GJDifficulty::NA;
-	}
+static constexpr auto is_demon(int diff) -> bool {
+	return diff >= 7 && diff <= 11;
 }
 
 [[nodiscard]]
-static constexpr bool is_demon(int f) {
-	return f >= 7 && f <= 11;
-}
-
-[[nodiscard]]
-static std::optional<GJGameLevel*> level_from_hit(matjson::Value const& hit) {
+static auto level_from_hit(matjson::Value const& hit) -> std::optional<GJGameLevel*> {
 	const int online_id = json_int(hit, "online_id");
 	if (online_id <= 0) {
 		return std::nullopt;
 	}
 
 	auto* level = GJGameLevel::create();
-	if (!level) {
+	if (level == nullptr) {
 		return std::nullopt;
 	}
 
@@ -120,38 +102,16 @@ static std::optional<GJGameLevel*> level_from_hit(matjson::Value const& hit) {
 	level->m_starsRequested = stars;
 
 	const int filter_diff = json_int(hit, "cache_filter_difficulty");
-	level->m_difficulty = difficulty_from_filter(filter_diff);
 	if (filter_diff == 1) {
 		level->m_autoLevel = true;
-	}
-	if (is_demon(filter_diff)) {
+	} else if (is_demon(filter_diff)) {
 		level->setDemon(1);
 		level->m_demonDifficulty = filter_diff - 6;
-	}
-
-	level->m_ratings = 1;
-	switch (filter_diff) {
-		case 1:
-			level->m_ratingsSum = 1;
-			break;
-		case 2:
-			level->m_ratingsSum = 3;
-			break;
-		case 3:
-			level->m_ratingsSum = 10;
-			break;
-		case 4:
-			level->m_ratingsSum = 20;
-			break;
-		case 5:
-			level->m_ratingsSum = 30;
-			break;
-		case 6:
-			level->m_ratingsSum = 40;
-			break;
-		default:
-			level->m_ratingsSum = 50;
-			break;
+		level->m_ratings = 10;
+		level->m_ratingsSum = 50;
+	} else if (filter_diff >= 2 && filter_diff <= 6) {
+		level->m_ratings = 10;
+		level->m_ratingsSum = (filter_diff - 1) * 10;
 	}
 
 	const int song_id = json_int(hit, "cache_song_id");
@@ -169,36 +129,36 @@ static std::optional<GJGameLevel*> level_from_hit(matjson::Value const& hit) {
 }
 
 [[nodiscard]]
-static std::string url_encode(std::string_view raw) {
-	std::string out;
+static auto url_encode(std::string_view raw) -> String {
+	String out;
 	out.reserve(raw.size() * 3);
-	for (unsigned char c : raw) {
-		if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
-			out += static_cast<char>(c);
-		} else if (c == ' ') {
+	for (unsigned char chr : raw) {
+		if ((std::isalnum(chr) != 0) || chr == '-' || chr == '_' || chr == '.' || chr == '~') {
+			out += static_cast<char>(chr);
+		} else if (chr == ' ') {
 			out += '+';
 		} else {
-			constexpr char HEX[] = "0123456789ABCDEF";
+			constexpr char hex[] = "0123456789ABCDEF";
 			out += '%';
-			out += HEX[(c >> 4) & 0xF];
-			out += HEX[c & 0xF];
+			out += hex[(chr >> 4) & 0xF];
+			out += hex[chr & 0xF];
 		}
 	}
 	return out;
 }
 
 [[nodiscard]]
-static std::vector<std::string> split_words(std::string const& s) {
+static auto split_words(String const& str) -> Vec<std::string> {
 	std::vector<std::string> words;
-	std::string word;
-	for (char c : s) {
-		if (c == ' ') {
+	String word;
+	for (char chr : str) {
+		if (chr == ' ') {
 			if (!word.empty()) {
 				words.push_back(word);
 				word.clear();
 			}
 		} else {
-			word += c;
+			word += chr;
 		}
 	}
 	if (!word.empty()) {
@@ -208,26 +168,25 @@ static std::vector<std::string> split_words(std::string const& s) {
 }
 
 [[nodiscard]]
-static std::string
-reconstruct_query(std::vector<std::string> const& words, std::size_t replace_idx, std::string const& replacement) {
-	std::string full;
+static auto reconstruct_query(Vec<std::string> const& words, std::size_t rep_idx, String const& rep) -> String {
+	String full;
 	for (std::size_t i = 0; i < words.size(); ++i) {
 		if (i > 0) {
 			full += ' ';
 		}
-		full += (i == replace_idx) ? replacement : words[i];
+		full += (i == rep_idx) ? rep : words[i];
 	}
 	return full;
 }
 
 [[nodiscard]]
-static std::string reconstruct_query_split(
+static auto reconstruct_query_split(
 	std::vector<std::string> const& words,
 	std::size_t split_idx,
-	std::string const& left,
-	std::string const& right
-) {
-	std::string full;
+	String const& left,
+	String const& right
+) -> String {
+	String full;
 	for (std::size_t i = 0; i < words.size(); ++i) {
 		if (i > 0) {
 			full += ' ';
@@ -242,20 +201,19 @@ static std::string reconstruct_query_split(
 }
 
 [[nodiscard]]
-static std::vector<std::string>
-generate_query_variations(std::string const& query, int max_count, int max_edit_distance) {
+static auto generate_query_variations(String const& query, int max_count, int med) -> std::vector<std::string> {
 	std::vector<std::string> result;
 	std::unordered_set<std::string> seen;
 
-	auto try_add = [&](std::string const& s) {
-		if (s.empty() || static_cast<int>(result.size()) >= max_count) {
+	auto try_add = [&](String const& str) -> void {
+		if (str.empty() || std::cmp_greater_equal(result.size(), max_count)) {
 			return;
 		}
-		if (seen.count(s)) {
+		if (seen.contains(str)) {
 			return;
 		}
-		seen.insert(s);
-		result.push_back(s);
+		seen.insert(str);
+		result.push_back(str);
 	};
 
 	try_add(query);
@@ -267,13 +225,13 @@ generate_query_variations(std::string const& query, int max_count, int max_edit_
 
 	if (dictionary::loaded()) {
 		for (std::size_t wi = 0; wi < words.size(); ++wi) {
-			const std::string lower = fuzzy::normalise(words[wi]);
+			const String lower = fuzzy::normalise(words[wi]);
 
 			if (dictionary::contains(lower)) {
 				continue;
 			}
 
-			auto candidates = dictionary::find_corrections(lower, max_edit_distance, 5);
+			auto candidates = dictionary::find_corrections(lower, med, 5);
 			for (auto const& [candidate, _dist] : candidates) {
 				try_add(reconstruct_query(words, wi, candidate));
 			}
@@ -286,8 +244,8 @@ generate_query_variations(std::string const& query, int max_count, int max_edit_
 	}
 
 	if (words.size() > 1) {
-		for (auto const& w : words) {
-			try_add(w);
+		for (auto const& word : words) {
+			try_add(word);
 		}
 	}
 
@@ -295,40 +253,44 @@ generate_query_variations(std::string const& query, int max_count, int max_edit_
 }
 
 [[nodiscard]]
-static int weighted_score(
+static auto weighted_score(
 	std::string_view query,
 	std::string_view name,
 	std::string_view creator,
 	int name_weight,
 	int creator_weight,
 	int max_typos
-) {
+) -> int {
 	int total = 0;
 	if (name_weight > 0 && !name.empty()) {
-		const int s = fuzzy::score_of(query, name, max_typos);
-		if (s != fuzzy::SCORE_NO_MATCH) {
-			total += (s * name_weight) / 100;
+		const int score = fuzzy::score_of(query, name, max_typos);
+		if (score != fuzzy::SCORE_NO_MATCH) {
+			total += (score * name_weight) / 100;
 		}
 	}
+
 	if (creator_weight > 0 && !creator.empty()) {
-		const int s = fuzzy::score_of(query, creator, max_typos);
-		if (s != fuzzy::SCORE_NO_MATCH) {
-			total += (s * creator_weight) / 100;
+		const int score = fuzzy::score_of(query, creator, max_typos);
+		if (score != fuzzy::SCORE_NO_MATCH) {
+			total += (score * creator_weight) / 100;
 		}
 	}
+
 	return total;
 }
 
 struct SearchContext {
-	std::string norm_query;
+	String norm_query;
+	query::ParsedQuery parsed;
 	int remaining;
 	int failed_count;
 	int total_queries;
 	std::unordered_set<int> seen_ids;
 	Ref<CCArray> collected;
 
-	SearchContext(std::string nq, int count) :
-		norm_query(std::move(nq)),
+	SearchContext(String norm_query, query::ParsedQuery parsed_query, int count) :
+		norm_query(std::move(norm_query)),
+		parsed(std::move(parsed_query)),
 		remaining(count),
 		failed_count(0),
 		total_queries(count),
@@ -339,13 +301,29 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 	struct Fields {
 		std::list<async::TaskHolder<web::WebResponse>> requests;
 		std::shared_ptr<SearchContext> search_ctx;
-		std::string pending_query;
+		String pending_query;
 		Ref<CCObject> pending_sender;
 		bool is_searching = false;
 	};
 
-	void show_toast(std::string const& msg) {
-		Notification::create(msg, NotificationIcon::None, 2.5f)->show();
+	bool init(int type) {
+		if (!LevelSearchLayer::init(type)) {
+			return false;
+		}
+
+		if (m_searchInput != nullptr) {
+			auto* input = m_searchInput;
+			if (!input->m_allowedChars.empty()) {
+				input->m_allowedChars += "\"<>=~!";
+			}
+			input->m_maxLabelLength = 256;
+		}
+
+		return true;
+	}
+
+	static void show_toast(String const& msg) {
+		Notification::create(msg, NotificationIcon::None, 2.5F)->show();
 	}
 
 	void cancel_searches() {
@@ -365,7 +343,7 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 		m_fields->pending_sender = nullptr;
 	}
 
-	void collect_hits(matjson::Value const& json, std::shared_ptr<SearchContext> const& ctx) {
+	static void collect_hits(matjson::Value const& json, std::shared_ptr<SearchContext> const& ctx) {
 		if (!json.isObject()) {
 			return;
 		}
@@ -376,15 +354,18 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 
 		auto const& hits = hits_opt.unwrap().asArray().unwrap();
 		for (auto const& hit : hits) {
-			const int id = json_int(hit, "online_id");
-			if (id <= 0 || ctx->seen_ids.count(id)) {
+			const int online_id = json_int(hit, "online_id");
+			if (online_id <= 0 || ctx->seen_ids.contains(online_id)) {
 				continue;
 			}
 			auto maybe_level = level_from_hit(hit);
 			if (!maybe_level) {
 				continue;
 			}
-			ctx->seen_ids.insert(id);
+			if (!query::level_passes(*maybe_level, ctx->parsed.filters)) {
+				continue;
+			}
+			ctx->seen_ids.insert(online_id);
 			ctx->collected->addObject(*maybe_level);
 		}
 	}
@@ -392,10 +373,19 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 	void finalize_search(std::shared_ptr<SearchContext> const& ctx) {
 		if (ctx->collected->count() == 0) {
 			log::info(
-				"[The Fuzz-inator 2000] All queries returned 0 results (failed={}/{}), falling back",
+				"[The Fuzz-inator 2000] All queries returned 0 results (failed={}/{})",
 				ctx->failed_count,
 				ctx->total_queries
 			);
+
+			if (!ctx->parsed.filters.empty() && ctx->failed_count < ctx->total_queries) {
+				m_fields->is_searching = false;
+				cancel_searches();
+				m_fields->pending_sender = nullptr;
+				show_toast("No levels matched your filters");
+				return;
+			}
+
 			do_fallback();
 			return;
 		}
@@ -416,7 +406,7 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 
 		for (unsigned int i = 0; i < ctx->collected->count(); ++i) {
 			auto* lvl = static_cast<GJGameLevel*>(ctx->collected->objectAtIndex(i));
-			int sc = weighted_score(
+			int score = weighted_score(
 				ctx->norm_query,
 				fuzzy::normalise(std::string(lvl->m_levelName)),
 				fuzzy::normalise(std::string(lvl->m_creatorName)),
@@ -424,18 +414,31 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 				creator_weight,
 				max_typos
 			);
-			entries.push_back({lvl, sc});
+
+			entries.push_back(
+				{
+					.level = lvl,
+					.score = score,
+				}
+			);
 		}
 
-		std::stable_sort(entries.begin(), entries.end(), [](Entry const& a, Entry const& b) {
-			return a.score > b.score;
-		});
+		if (ctx->parsed.exact_match) {
+			std::ranges::stable_sort(entries, [](Entry const& lhs, Entry const& rhs) -> bool {
+				return lhs.level->m_downloads > rhs.level->m_downloads;
+			});
+		} else {
+			std::ranges::stable_sort(entries, [](Entry const& lhs, Entry const& rhs) -> bool {
+				return lhs.score > rhs.score;
+			});
+		}
 
 		log::info(
 			"[The Fuzz-inator 2000] {} unique levels collected for \"{}\"",
 			entries.size(),
 			m_fields->pending_query
 		);
+
 		for (std::size_t i = 0; i < std::min(entries.size(), std::size_t(5)); ++i) {
 			auto* lvl = entries[i].level;
 			log::debug(
@@ -450,27 +453,29 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 
 		auto* arr = CCArray::create();
 		arr->retain();
-		for (auto& e : entries) {
-			arr->addObject(e.level);
+
+		for (auto& entry : entries) {
+			arr->addObject(entry.level);
 		}
 
 		m_fields->pending_sender = nullptr;
 		cancel_searches();
 
-		if (pending_levels) {
+		if (pending_levels != nullptr) {
 			pending_levels->release();
 			pending_levels = nullptr;
 		}
+
 		pending_levels = arr;
-		inject_on_load = true;
+		INJECT_ON_LOAD = true;
 
 		auto* search_obj = GJSearchObject::create(SearchType::Search);
 		search_obj->m_searchQuery = m_fields->pending_query;
 		auto* scene = LevelBrowserLayer::scene(search_obj);
-		CCDirector::get()->pushScene(CCTransitionFade::create(0.5f, scene));
+		CCDirector::get()->replaceScene(CCTransitionFade::create(0.5F, scene));
 	}
 
-	void on_response(web::WebResponse const& res, std::shared_ptr<SearchContext> ctx) {
+	void on_response(web::WebResponse const& res, const std::shared_ptr<SearchContext>& ctx) {
 		if (ctx != m_fields->search_ctx) {
 			return;
 		}
@@ -506,13 +511,20 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 			return;
 		}
 
-		if (!m_searchInput) {
+		if (m_searchInput == nullptr) {
 			LevelSearchLayer::onSearch(sender);
 			return;
 		}
 
-		const std::string raw_query = m_searchInput->getString();
+		const String raw_query = m_searchInput->getString();
 		if (raw_query.empty()) {
+			LevelSearchLayer::onSearch(sender);
+			return;
+		}
+
+		auto parsed = query::parse(raw_query);
+
+		if (parsed.search_text.empty() && parsed.filters.empty()) {
 			LevelSearchLayer::onSearch(sender);
 			return;
 		}
@@ -526,21 +538,33 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 		const int max_queries = Mod::get()->getSettingValue<int64_t>("query-variations");
 		const int max_typos = Mod::get()->getSettingValue<int64_t>("max-typos");
 
-		auto variations = generate_query_variations(raw_query, max_queries, max_typos);
-		const auto norm_query = fuzzy::normalise(raw_query);
-
-		log::info(
-			"[The Fuzz-inator 2000] Searching with {} query variation(s) for \"{}\"",
-			variations.size(),
-			raw_query
-		);
-		for (auto const& v : variations) {
-			log::debug("[The Fuzz-inator 2000]   variation: \"{}\"", v);
+		std::vector<std::string> variations;
+		if (parsed.exact_match) {
+			variations.push_back(parsed.search_text);
+		} else if (!parsed.search_text.empty()) {
+			variations = generate_query_variations(parsed.search_text, max_queries, max_typos);
+		} else {
+			variations.push_back("");
 		}
 
-		show_toast("Fuzzy searching via GDHistory…");
+		const auto norm_query = fuzzy::normalise(parsed.search_text);
 
-		auto ctx = std::make_shared<SearchContext>(norm_query, static_cast<int>(variations.size()));
+		log::info(
+			"[The Fuzz-inator 2000] Searching with {} query variation(s) for \"{}\"{}",
+			variations.size(),
+			raw_query,
+			parsed.exact_match ? " (exact match)" : ""
+		);
+		for (auto const& var : variations) {
+			log::debug("[The Fuzz-inator 2000]   variation: \"{}\"", var);
+		}
+		if (!parsed.filters.empty()) {
+			log::info("[The Fuzz-inator 2000] {} filter(s) active", parsed.filters.size());
+		}
+
+		show_toast(parsed.exact_match ? "Exact searching via GDHistory…" : "Fuzzy searching via GDHistory…");
+
+		auto ctx = std::make_shared<SearchContext>(norm_query, std::move(parsed), static_cast<int>(variations.size()));
 		m_fields->search_ctx = ctx;
 
 		const int per_query_limit = std::max(5, limit / static_cast<int>(variations.size()));
@@ -548,8 +572,13 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 		Ref<FuzzySearchLayer> self = this;
 
 		for (auto const& variation : variations) {
-			const std::string url = GDHISTORY_SEARCH_URL + "?query=" + url_encode(variation) +
-				"&limit=" + std::to_string(per_query_limit) + "&matching_strategy=last";
+			String url = GDHISTORY_SEARCH_URL + "?limit=" + std::to_string(per_query_limit);
+			if (!variation.empty()) {
+				url += "&query=" + url_encode(variation) + "&matching_strategy=last";
+			}
+			if (ctx->parsed.include_deleted) {
+				url += "&is_deleted=true";
+			}
 
 			log::info("[The Fuzz-inator 2000] Requesting: {}", url);
 
@@ -560,7 +589,7 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 			m_fields->requests.emplace_back();
 			auto& holder = m_fields->requests.back();
 
-			holder.spawn(req.get(url), [self, ctx](web::WebResponse value) {
+			holder.spawn(req.get(url), [self, ctx](const web::WebResponse& value) -> void {
 				if (!self) {
 					return;
 				}
@@ -571,20 +600,33 @@ class $modify(FuzzySearchLayer, LevelSearchLayer) {
 };
 
 class $modify(FuzzyBrowserLayer, LevelBrowserLayer) {
+	struct Fields {
+		Ref<CCArray> fuzzy_levels;
+	};
+
 	void setupLevelBrowser(CCArray* items) {
-		if (!inject_on_load || !pending_levels) {
+		if (!INJECT_ON_LOAD || (pending_levels == nullptr)) {
 			LevelBrowserLayer::setupLevelBrowser(items);
 			return;
 		}
 
 		CCArray* arr = pending_levels;
 		pending_levels = nullptr;
-		inject_on_load = false;
+		INJECT_ON_LOAD = false;
+
+		m_fields->fuzzy_levels = arr;
 
 		log::info("[The Fuzz-inator 2000] Injecting {} levels into LevelBrowserLayer", arr->count());
 
 		LevelBrowserLayer::setupLevelBrowser(arr);
 		this->loadLevelsFinished(arr, "", 0);
 		arr->release();
+	}
+
+	void loadPage(GJSearchObject* obj) {
+		if (m_fields->fuzzy_levels != nullptr) {
+			return;
+		}
+		LevelBrowserLayer::loadPage(obj);
 	}
 };

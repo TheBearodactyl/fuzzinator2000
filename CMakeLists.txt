@@ -10,7 +10,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 project(FuzzySearch VERSION 1.0.0)
 
-file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/fuzzy.cpp src/main.cpp src/dictionary.cpp)
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS src/fuzzy.cpp src/main.cpp src/dictionary.cpp src/query.cpp)
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
 if (NOT DEFINED ENV{GEODE_SDK})

@@ -1,0 +1,70 @@
+Completion:
+  HeaderInsertion: Never
+  ArgumentLists: Delimiters
+  MacroFilter: FuzzyMatch
+
+InlayHints:
+  Enabled: true
+  BlockEnd: false
+  TypeNameLimit: 48
+
+CompileFlags:
+  Add: [-xc++, -Wall, -Wextra, -Wpedantic, -Wunused]
+  Compiler: clang++
+
+Style:
+  AngledHeaders: ["gay/.*", "Geode/.*"]
+
+Diagnostics:
+  ClangTidy:
+    FastCheckFilter: Loose
+    Add: [bugprone*, modernize*, performance*, readability*]
+    Remove: [readability-magic-numbers, bugprone-easily-swappable-parameters]
+    CheckOptions:
+      readability-identifier-naming.ClassCase: CamelCase
+      readability-identifier-naming.StructCase: CamelCase
+      readability-identifier-naming.AbstractClassCase: CamelCase
+      readability-identifier-naming.UnionCase: CamelCase
+      readability-identifier-naming.EnumCase: CamelCase
+      readability-identifier-naming.EnumConstantCase: CamelCase
+      readability-identifier-naming.TemplateParameterCase: CamelCase
+      readability-identifier-naming.TemplateTemplateParameterCase: CamelCase
+      readability-identifier-naming.ConceptCase: CamelCase
+      readability-identifier-naming.FunctionCase: lower_case
+      readability-identifier-naming.GlobalFunctionCase: lower_case
+      readability-identifier-naming.MethodCase: lower_case
+      readability-identifier-naming.ClassMethodCase: lower_case
+      readability-identifier-naming.ConstexprFunctionCase: lower_case
+      readability-identifier-naming.ConstexprMethodCase: lower_case
+      readability-identifier-naming.VirtualMethodCase: lower_case
+      readability-identifier-naming.VariableCase: lower_case
+      readability-identifier-naming.LocalVariableCase: lower_case
+      readability-identifier-naming.GlobalVariableCase: UPPER_CASE
+      readability-identifier-naming.MemberCase: lower_case
+      readability-identifier-naming.ClassMemberCase: lower_case
+      readability-identifier-naming.PublicMemberCase: lower_case
+      readability-identifier-naming.PrivateMemberCase: lower_case
+      readability-identifier-naming.ProtectedMemberCase: lower_case
+      readability-identifier-naming.ParameterCase: lower_case
+      readability-identifier-naming.ConstantParameterCase: lower_case
+      readability-identifier-naming.ConstantPointerParameterCase: lower_case
+      readability-identifier-naming.LocalPointerCase: lower_case
+      readability-identifier-naming.GlobalPointerCase: lower_case
+      readability-identifier-naming.ConstantCase: UPPER_CASE
+      readability-identifier-naming.ConstantMemberCase: UPPER_CASE
+      readability-identifier-naming.LocalConstantCase: lower_case
+      readability-identifier-naming.GlobalConstantCase: UPPER_CASE
+      readability-identifier-naming.GlobalConstantPointerCase: UPPER_CASE
+      readability-identifier-naming.LocalConstantPointerCase: lower_case
+      readability-identifier-naming.ClassConstantCase: UPPER_CASE
+      readability-identifier-naming.LocalConstexprVariableCase: lower_case
+      readability-identifier-naming.GlobalConstexprVariableCase: UPPER_CASE
+      readability-identifier-naming.ClassConstexprCase: UPPER_CASE
+      readability-identifier-naming.StaticConstantCase: UPPER_CASE
+      readability-identifier-naming.StaticVariableCase: UPPER_CASE
+      readability-identifier-naming.NamespaceCase: lower_case
+      readability-identifier-naming.InlineNamespaceCase: lower_case
+      readability-identifier-naming.ValueTemplateParameterCase: UPPER_CASE
+
+Documentation:
+  CommentFormat: Doxygen

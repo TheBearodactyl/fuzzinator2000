@@ -2,10 +2,9 @@
 
 #include <algorithm>
 #include <limits>
-#include <optional>
-#include <string>
-#include <string_view>
 #include <vector>
+
+#include "utils.hpp"
 
 namespace fuzzy {
 	constexpr int SCORE_MATCH = 16;
@@ -20,45 +19,52 @@ namespace fuzzy {
 
 	struct MatchResult {
 		int score;
-		std::vector<int> positions;
+		Vec<int> positions;
 	};
 
 	[[nodiscard]]
-	std::optional<MatchResult> find_match(std::string_view needle, std::string_view haystack);
+	auto find_match(needle_haysack) -> Option<MatchResult>;
 
 	[[nodiscard]]
-	int score_of(std::string_view needle, std::string_view haystack, int max_typos = 0);
+	auto score_of(needle_haysack, int max_typos = 0) -> int;
 
 	[[nodiscard]]
-	bool is_subsequence(std::string_view needle, std::string_view haystack);
+	auto is_subsequence(needle_haysack) -> bool;
 
 	[[nodiscard]]
-	std::string normalise(std::string_view raw);
+	auto normalise(StringV raw) -> String;
 
 	template<typename T, typename KeyFn>
-	void sort_by_score(std::vector<T>& items, std::string_view query, KeyFn key_fn);
+	void sort_by_score(Vec<T>& items, StringV query, KeyFn key_fn);
 } // namespace fuzzy
 
 namespace fuzzy {
 	template<typename T, typename KeyFn>
-	void sort_by_score(std::vector<T>& items, std::string_view query, KeyFn key_fn) {
+	void sort_by_score(Vec<T>& items, StringV query, KeyFn key_fn) {
 		if (query.empty()) {
 			return;
 		}
 
-		std::vector<std::pair<int, std::size_t>> scored;
+		Vec<std::pair<int, std::size_t>> scored;
+
 		scored.reserve(items.size());
+
 		for (std::size_t i = 0; i < items.size(); ++i) {
 			scored.emplace_back(score_of(query, key_fn(items[i])), i);
 		}
 
-		std::stable_sort(scored.begin(), scored.end(), [](auto const& a, auto const& b) { return a.first > b.first; });
+		std::stable_sort(scored.begin(), scored.end(), [](auto const& lhs, auto const& rhs) -> auto {
+			return lhs.first > rhs.first;
+		});
 
-		std::vector<T> sorted;
+		Vec<T> sorted;
+
 		sorted.reserve(items.size());
-		for (auto const& [sc, idx] : scored) {
+
+		for (auto const& [unused, idx] : scored) {
 			sorted.push_back(std::move(items[idx]));
 		}
+
 		items = std::move(sorted);
 	}
 } // namespace fuzzy

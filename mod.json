@@ -8,7 +8,7 @@
   },
   "id": "the-motherfricking-bearodactyl.fuzzinator2000",
   "name": "The Fuzz-inator 2000",
-  "version": "v1.0.1",
+  "version": "v1.1.0",
   "developer": "The Bearodactyl",
   "description": "Makes level search fuzzy",
   "dependencies": {
